@@ -94,9 +94,25 @@ export default function PaginaPrincipal() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center text-blue-500 font-bold text-xl">
-        Carregando Sonozen...
-      </div>
+      <div className="min-h-screen flex flex-col md:flex-row bg-gray-950 text-white font-sans">
+            
+            {/* Layout Externo: Barra Lateral */}
+            <Sidebar/>
+      
+            {/* Conteúdo Principal Central */}
+            <main className="flex-1 md:ml-64 pb-20 md:pb-0">
+              <div className="container py-6 md:py-10 max-w-4xl mx-auto px-6 space-y-8">
+                <hr className="border-gray-800" />
+                  <div className="min-h-screen bg-gray-950 flex items-center justify-center text-blue-500 font-bold text-xl">
+                  Carregando Sonozen...
+                  </div>
+              </div>
+            </main>
+      
+            {/* Layout Externo: Navegação Mobile */}
+            <MobileNav />
+      
+          </div>
     );
   }
 
@@ -110,7 +126,6 @@ export default function PaginaPrincipal() {
       <main className="flex-1 md:ml-64 pb-20 md:pb-0">
         <div className="container py-6 md:py-10 max-w-4xl mx-auto px-6 space-y-8">
           
-          <Header usuario={usuario} onDeslogar={deslogar} />
 
           <AIChat 
             input={input} 
