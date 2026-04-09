@@ -20,7 +20,7 @@ Funcionalidade: Autenticação de Usuário
 
   Cenário: Logout
     Dado que eu estou logado com o usuário "amanda@gmail.com" e a senha "amanda123"
-    Quando eu acesso a pagina de perfil
+    Quando eu acesso a pagina de "profile"
     E eu clico no botão "Sair"
     Então eu devo ser redirecionado para a página de login
 

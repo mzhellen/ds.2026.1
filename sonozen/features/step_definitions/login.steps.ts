@@ -1,94 +1,55 @@
-import { Given, When, Then, Before, After } from '@cucumber/cucumber';
-import { chromium, Browser, Page } from 'playwright';
+// features/step_definitions/login.steps.ts
+import { Given, When, Then } from '@cucumber/cucumber';
 import assert from 'assert';
+import { CustomWorld } from './setup.js'; // Importe a tipagem (o Node precisa do .js aqui na importação TS)
 
-let browser: Browser;
-let page: Page;
-let mensagemAlerta = ""; // Variável para guardar o texto do alert()
-
-Before(async () => {
-  browser = await chromium.launch({ headless: false });
-  page = await browser.newPage();
-
-  // O Playwright precisa ser avisado para interceptar alertas (window.alert)
-  page.on('dialog', async dialog => {
-    mensagemAlerta = dialog.message(); // Guarda a mensagem
-    await dialog.accept(); // Clica em "OK" automaticamente
-  });
+Given('que eu estou na página de login', async function (this: CustomWorld) {
+  // ATENÇÃO: Use this.page! (A exclamação diz ao TS que a página existe)
+  await this.page!.goto('http://localhost:3000/login');
 });
 
-After(async () => {
-  mensagemAlerta = ""; // Limpa a mensagem para o próximo teste
-  if (browser) {
-    await browser.close();
+Given('que eu estou logado com o usuário {string} e a senha {string}', async function (this: CustomWorld, email, senha) {
+  await this.page!.goto('http://localhost:3000/login');
+  
+  await this.page!.locator('input[type="email"]').fill(email);
+  await this.page!.locator('input[type="password"]').fill(senha);
+  
+  await this.page!.getByRole('button', { name: 'Acessar Conta' }).click();
+  
+  await this.page!.waitForURL('**/home', { timeout: 10000 });
+});
+
+When('eu preencho o e-mail com {string} e a senha com {string}', async function (this: CustomWorld, email, senha) {
+  await this.page!.locator('input[type="email"]').fill(email);
+  await this.page!.locator('input[type="password"]').fill(senha);
+});
+
+When(/^(?:eu )?clico no botão "([^"]*)"$/, async function (this: CustomWorld, textoBotao) {
+  await this.page!.getByRole('button', { name: textoBotao }).click();
+});
+
+When('eu acesso a pagina de {string}', async function (this: CustomWorld, pagina) {
+  await this.page!.goto(`http://localhost:3000/${pagina}`);
+});
+
+Then('eu devo ser redirecionado para a página home', async function (this: CustomWorld) {
+  await this.page!.waitForURL('http://localhost:3000/home');
+  assert.strictEqual(this.page!.url(), 'http://localhost:3000/home');
+});
+
+Then('eu devo ver uma mensagem de erro', async function (this: CustomWorld) {
+  for (let i = 0; i < 10; i++) {
+    if (this.mensagemAlerta) break;
+    await this.page!.waitForTimeout(500);
   }
+
+  assert(
+    this.mensagemAlerta.includes("Erro"),
+    `Esperava um erro, mas recebeu: ${this.mensagemAlerta}`
+  );
 });
 
-// --- CENÁRIO 1 E 2: NAVEGAÇÃO E LOGIN ---
-
-Given('que eu estou na página de login', async function () {
-  await page.goto('http://localhost:3000/login');
-});
-
-When('eu preencho o e-mail com {string} e a senha com {string}', async function (email, senha) {
-  await page.locator('input[type="email"]').fill(email);
-  await page.locator('input[type="password"]').fill(senha);
-});
-
-// O (eu )? serve para aceitar tanto "E clico" quanto "E eu clico"
-When(/^(?:eu )?clico no botão "([^"]*)"$/, async function (textoBotao) {
-  await page.getByRole('button', { name: textoBotao }).click();
-});
-
-Then('eu devo ser redirecionado para a página home', async function () {
-  await page.waitForURL('http://localhost:3000/home');
-  assert.strictEqual(page.url(), 'http://localhost:3000/home');
-});
-
-Then('eu devo ver uma mensagem de erro', async function () {
-  // Espera um segundo para dar tempo do Supabase responder e o alert aparecer
-  await page.waitForTimeout(1000); 
-  
-  // Verifica se a mensagem salva não está vazia e contém a palavra "Erro"
-  assert(mensagemAlerta.includes("Erro"), `Esperava um erro, mas recebeu: ${mensagemAlerta}`);
-});
-
-
-// --- CENÁRIO 3: LOGOUT ---
-
-// No arquivo features/step_definitions/login.steps.ts, atualize o passo de Logout:
-
-Given('que eu estou logado com o usuário {string} e a senha {string}', async function (email, senha) {
-  // 1. Vai para a página de login
-  await page.goto('http://localhost:3000/login');
-  
-  // 2. Preenche com os dados que vieram do arquivo .feature
-  await page.locator('input[type="email"]').fill(email);
-  await page.locator('input[type="password"]').fill(senha);
-  
-  // 3. Clica para entrar
-  await page.getByRole('button', { name: 'Acessar Conta' }).click();
-  
-  // 4. Aguarda chegar na home para garantir que o login funcionou e o botão renderizou
-  await page.waitForURL('http://localhost:3000/home');
-});
-
-Then('eu acesso a pagina de perfil', async function () {
-  // 1. Clica no LINK da página de perfil (Role: 'link')
-  await page.getByRole('link', { name: 'Perfil' }).click();
-
-  // 2. Aguarda o redirecionamento acontecer
-  await page.waitForURL('http://localhost:3000/profile');
-  assert.strictEqual(page.url(), 'http://localhost:3000/profile');
-
-  // 3. Agora sim, clica no BOTÃO de logout "Sair" (Role: 'button')
-  await page.getByRole('button', { name: 'Sair' }).click();
-});
-
-Then('eu devo ser redirecionado para a página de login', async function () {
-  // Espera a página terminar de carregar a nova rota
-  await page.waitForURL('http://localhost:3000/login');
-  
-  // Confirma se a URL atual é realmente a tela de login
-  assert.strictEqual(page.url(), 'http://localhost:3000/login');
+Then('eu devo ser redirecionado para a página de login', async function (this: CustomWorld) {
+  await this.page!.waitForURL('http://localhost:3000/login');
+  assert.strictEqual(this.page!.url(), 'http://localhost:3000/login');
 });
