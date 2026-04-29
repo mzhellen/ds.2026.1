@@ -3,9 +3,6 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabase";
-import { useRouter } from "next/navigation";
-
-// Importando os componentes modulares
 import Sidebar from "../../components/Sidebar";
 import MobileNav from "../../components/MobileNav";
 import DiagnosticForm from "../../components/DiagnosticForm";
@@ -13,27 +10,41 @@ import DiagnosticForm from "../../components/DiagnosticForm";
 export default function DiagnosticPage() {
   const [loading, setLoading] = useState(true);
   const [diagnosticoAtual, setDiagnosticoAtual] = useState<any>(null);
+  const [riscos, setRiscos] = useState<any[]>([]);
   const [isRefazendo, setIsRefazendo] = useState(false);
 
-  // Função para buscar se o usuário já tem diagnóstico no banco
+  // Função para buscar se o usuário já tem diagnóstico e os riscos associados
   const fetchDiagnostico = async () => {
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
     
     if (user) {
-      const { data, error } = await supabase
+      // Busca o diagnóstico principal
+      const { data: diagData } = await supabase
         .from("diagnosticos_sono")
-        .select("score_obtido, classificacao_ia, resumo_ia, atualizado_em, processado_ia")
+        .select("id, score_obtido, classificacao_ia, resumo_ia, atualizado_em, processado_ia")
         .eq("usuario_id", user.id)
         .order("criado_em", { ascending: false })
         .limit(1)
         .single();
 
-      // Só consideramos como um diagnóstico válido se a IA já o processou
-      if (data && data.processado_ia) {
-        setDiagnosticoAtual(data);
+      if (diagData && diagData.processado_ia) {
+        setDiagnosticoAtual(diagData);
+
+        // Se encontrou o diagnóstico, busca os fatores de risco atrelados a ele
+        const { data: riscosData } = await supabase
+          .from("fatores_risco_detectados")
+          .select("*")
+          .eq("usuario_id", user.id)
+          .eq("diagnostico_id", diagData.id)
+          .order("criado_em", { ascending: true });
+
+        if (riscosData) {
+          setRiscos(riscosData);
+        }
       } else {
         setDiagnosticoAtual(null);
+        setRiscos([]);
       }
     }
     setLoading(false);
@@ -43,7 +54,6 @@ export default function DiagnosticPage() {
     fetchDiagnostico();
   }, []);
 
-  // Formata a data para exibir bonito
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString("pt-BR", {
@@ -51,13 +61,12 @@ export default function DiagnosticPage() {
     });
   };
 
-  // Se estiver carregando, mostra apenas um layout vazio
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col md:flex-row bg-gray-950 text-white font-sans">
         <Sidebar />
         <main className="flex-1 md:ml-64 flex items-center justify-center">
-          <p className="text-gray-400">Carregando dados...</p>
+          <p className="text-gray-400 animate-pulse">Carregando dados...</p>
         </main>
         <MobileNav />
       </div>
@@ -69,13 +78,13 @@ export default function DiagnosticPage() {
       <Sidebar />
 
       <main className="flex-1 md:ml-64 pb-20 md:pb-0 flex flex-col">
-        <div className="container py-6 md:py-10 max-w-4xl flex-1 flex flex-col">
+        <div className="container py-6 md:py-10 max-w-4xl flex-1 flex flex-col px-6">
           
-          {/* SE TIVER DIAGNÓSTICO E NÃO ESTIVER REFAZENDO, MOSTRA O RESUMO */}
           {diagnosticoAtual && !isRefazendo ? (
-            <div className="max-w-2xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="max-w-2xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-8">
               
-              <div className="flex justify-between items-end mb-8 border-b border-gray-800 pb-4">
+              {/* Cabeçalho */}
+              <div className="flex justify-between items-end border-b border-gray-800 pb-4">
                 <div>
                   <h2 className="text-3xl font-bold mb-1">Seu Diagnóstico</h2>
                   <p className="text-gray-400 text-sm">
@@ -90,8 +99,8 @@ export default function DiagnosticPage() {
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                {/* Card Score */}
+              {/* Cards de Score e Classificação */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="bg-gray-900 border border-gray-800 p-6 rounded-2xl flex flex-col items-center justify-center text-center shadow-lg relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-bl-full -mr-10 -mt-10"></div>
                   <p className="text-gray-400 font-semibold mb-2 uppercase text-xs tracking-wider">Score de Sono</p>
@@ -99,7 +108,6 @@ export default function DiagnosticPage() {
                   <p className="text-xs text-gray-500">Pontuação de 0 a 100</p>
                 </div>
 
-                {/* Card Classificação */}
                 <div className="bg-gray-900 border border-gray-800 p-6 rounded-2xl flex flex-col items-center justify-center text-center shadow-lg relative overflow-hidden">
                    <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 rounded-bl-full -mr-10 -mt-10"></div>
                   <p className="text-gray-400 font-semibold mb-2 uppercase text-xs tracking-wider">Classificação IA</p>
@@ -118,12 +126,40 @@ export default function DiagnosticPage() {
                   {diagnosticoAtual.resumo_ia}
                 </p>
               </div>
+
+              {/* Fatores de Risco */}
+              {riscos.length > 0 && (
+                <div className="pt-4">
+                  <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-white">
+                    <span className="text-red-400">⚠️</span> Sabotadores do Sono
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {riscos.map((risco) => (
+                      <div key={risco.id} className="bg-red-950/20 border border-red-900/50 p-5 rounded-2xl flex flex-col justify-between">
+                        <div>
+                          <h4 className="text-red-400 font-semibold text-lg mb-2">{risco.titulo_risco}</h4>
+                          <p className="text-gray-300 text-sm mb-4 leading-relaxed">
+                            {risco.texto_impacto}
+                          </p>
+                        </div>
+                        <div className="bg-red-900/20 p-3 rounded-xl border border-red-800/30 mt-auto">
+                          <span className="text-[10px] font-bold text-red-300 uppercase tracking-wider block mb-1">
+                            Ação Recomendada: {risco.titulo_acao}
+                          </span>
+                          <p className="text-gray-400 text-xs">
+                            {risco.texto_acao}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
             </div>
           ) : (
-            // SE NÃO TIVER DIAGNÓSTICO OU CLICOU EM REFAZER, MOSTRA O FORMULÁRIO
             <DiagnosticForm 
               onSuccess={() => {
-                // Quando o formulário termina, desativamos o modo refazer e recarregamos os dados
                 setIsRefazendo(false);
                 fetchDiagnostico();
               }} 
