@@ -1,8 +1,8 @@
+// src/app/api/diagnostico/route.ts
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// Inicializa o cliente Admin para ignorar o RLS no servidor
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -19,7 +19,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "IDs ausentes." }, { status: 400 });
     }
 
-    // 1. Busca os dados exatos do diagnóstico
     const { data: diagnosticoInput, error: fetchError } = await supabaseAdmin
       .from("diagnosticos_sono")
       .select("*")
@@ -30,39 +29,74 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Diagnóstico não encontrado." }, { status: 404 });
     }
 
-    // 2. Prompt de Sistema (Contrato Rígido)
+    // O SEU PROMPT COMPLETO E EXATO AQUI
     const systemPrompt = `
-Você é um processador de dados clínicos especializado em cronobiologia. 
-Sua função é receber um JSON com hábitos de sono e retornar EXCLUSIVAMENTE um objeto JSON válido.
+<INSTRUCOES_DE_SISTEMA>
+Você é um processador de dados clínicos. Sua função é receber um JSON de input com hábitos de sono, aplicar regras de negócio de cronobiologia e retornar EXCLUSIVAMENTE um objeto JSON válido.
 
-REGRAS DE FORMATAÇÃO:
-1. Retorne apenas o JSON puro, sem markdown ou explicações.
-2. A rotina deve ter de 6 a 8 itens, terminando no horário de "janela_horario".
-3. IDs de Dicas Genéricas: 1 (Luz Azul), 2 (Cafeína), 3 (Quarto Fresco), 4 (4-7-8), 5 (Ritual), 6 (Body Scan).
+REGRAS DE FORMATAÇÃO ESTRITA (CRÍTICO PARA O SISTEMA):
+1. O retorno DEVE ser um único objeto JSON válido.
+2. NÃO adicione nenhum texto antes ou depois do JSON (sem saudações, sem explicações).
+3. NÃO utilize blocos de código markdown (não inclua \`\`\`json ou \`\`\`). Retorne apenas o texto puro do JSON.
+4. Escapar corretamente aspas duplas dentro dos textos.
 
-SCHEMA DE SAÍDA:
+REGRAS DE NEGÓCIO E LÓGICA:
+1. Calculo de Horário: A "rotina" deve ter exatamente de 6 a 8 itens. O último item deve terminar no horário especificado em "janela_horario" do input. Retroceda os minutos em "horario_inicio" com base em "duracao_minutos".
+2. Fatores de Risco: Liste exatamente os 3 maiores sabotadores do sono com base no input.
+3. Dicas Genéricas e Personalizadas (CRÍTICO): 
+   - Você DEVE selecionar OBRIGATORIAMENTE entre 2 a 4 IDs do "Catálogo de Dicas Genéricas" abaixo que cruzem com os problemas do usuário.
+   - Você DEVE criar OBRIGATORIAMENTE entre 4 a 6 "Dicas Personalizadas" exclusivas, baseadas fortemente no campo "descricao_rotina_detalhada" e na rotina do usuário.
+    - Você deve ter no total 8 dicas
+
+CATÁLOGO DE DICAS GENÉRICAS (Para a chave "dicas_selecionadas"):
+- ID 1: "Reduza a luz azul à noite" (Telas bloqueiam melatonina. Desligue eletrônicos 1h antes ou use filtro quente).
+- ID 2: "Evite cafeína após as 14h" (Cafeína fica no sangue até 8h. Limite à parte da manhã).
+- ID 3: "Mantenha o quarto fresco" (Temperatura entre 18°C e 22°C avisa ao corpo para descansar).
+- ID 4: "Pratique a técnica 4-7-8" (Inspiração 4s, segura 7s, expiração 8s para relaxamento profundo).
+- ID 5: "Crie um ritual consistente" (Mesmo horário para dormir/acordar, ajustando o relógio biológico).
+- ID 6: "Body Scan Meditation" (Foco progressivo em relaxar cada grupo muscular).
+
+SCHEMA DE SAÍDA OBRIGATÓRIO (RESPEITE OS LIMITES DE TAMANHO):
 {
   "geral": {
-    "score_obtido": <integer>,
-    "classificacao_ia": "<string>",
-    "resumo_ia": "<string>"
+    "score_obtido": <integer, 0 a 100>,
+    "classificacao_ia": "<string, 2 a 5 palavras, ex: Alerta Moderado>",
+    "resumo_ia": "<string, exatamente 2 a 3 frases, máximo 200 caracteres. Direto e clínico.>"
   },
   "rotina": [
-    { "ordem": <int>, "horario_inicio": "HH:MM", "duracao_minutos": <int>, "atividade": "<string>", "descricao": "<string>", "por_que": "<string>", "icone_nome": "<string>" }
+    {
+      "ordem": <integer, sequencial começando em 1>,
+      "horario_inicio": "<string, formato HH:MM>",
+      "duracao_minutos": <integer>,
+      "atividade": "<string, máximo 6 palavras>",
+      "descricao": "<string, 1 frase curta, máximo 100 caracteres. Ação clara.>",
+      "por_que": "<string, 1 a 2 frases, máximo 120 caracteres. O motivo biológico.>",
+      "icone_nome": "<string>"
+    }
   ],
   "riscos": [
-    { "titulo_risco": "<string>", "texto_impacto": "<string>", "titulo_acao": "<string>", "texto_acao": "<string>" }
+    {
+      "titulo_risco": "<string, máximo 4 palavras>",
+      "texto_impacto": "<string, máximo 120 caracteres. Como isso sabota o sono.>",
+      "titulo_acao": "<string, máximo 4 palavras. Verbo de ação.>",
+      "texto_acao": "<string, máximo 120 caracteres. O que fazer para resolver.>"
+    }
   ],
-  "dicas_selecionadas": [<int>],
+  "dicas_selecionadas": [<integer, exatamente 3 ou 4 IDs do catálogo>],
   "dicas_personalizadas": [
-    { "titulo": "<string>", "descricao": "<string>", "icone_nome": "<string>" }
+    {
+      "titulo": "<string, máximo 5 palavras>",
+      "descricao": "<string, máximo 150 caracteres. Hiper-personalizada baseada no input do usuário.>",
+      "icone_nome": "<string>"
+    }
   ]
 }
+</INSTRUCOES_DE_SISTEMA>
 `;
 
-    const promptCompleto = `${systemPrompt}\n\n<INPUT_USUARIO>\n${JSON.stringify(diagnosticoInput)}\n</INPUT_USUARIO>`;
+    // Injeta os dados do Supabase diretamente na tag dinâmica
+    const promptCompleto = `${systemPrompt}\n\n<INPUT_USUARIO>\n${JSON.stringify(diagnosticoInput, null, 2)}\n</INPUT_USUARIO>`;
 
-    // 3. Chamada à IA
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
     
     const result = await model.generateContent({
@@ -72,7 +106,7 @@ SCHEMA DE SAÍDA:
 
     const iaData = JSON.parse(result.response.text().replace(/```json/gi, "").replace(/```/g, "").trim());
 
-    // 4. Limpeza de dados antigos
+    // 4. Limpeza das tabelas secundárias
     await Promise.all([
       supabaseAdmin.from("rotinas_pre_sono").delete().eq("usuario_id", usuarioId),
       supabaseAdmin.from("fatores_risco_detectados").delete().eq("usuario_id", usuarioId),
@@ -80,20 +114,20 @@ SCHEMA DE SAÍDA:
       supabaseAdmin.from("dicas_personalizadas").delete().eq("usuario_id", usuarioId)
     ]);
 
-    // 5. Atualização da tabela principal (Usando os nomes REAIS da sua tabela)
+    // 5. ATUALIZAÇÃO DO DIAGNÓSTICO
     const { error: updateError } = await supabaseAdmin
       .from("diagnosticos_sono")
       .update({
-        score_obtido: Number(iaData.geral.score_obtido),
+        score_obtido: Number(iaData.geral.score_obtido) || 50,
         classificacao_ia: String(iaData.geral.classificacao_ia),
         resumo_ia: String(iaData.geral.resumo_ia),
-        processado_ia: true // Nome correto da coluna identificado no seu dump
+        processado_ia: true
       })
       .eq("id", diagnosticoId);
 
     if (updateError) throw new Error(`Erro no Update: ${updateError.message}`);
 
-    // 6. Inserção dos dados detalhados
+    // 6. Inserções das novas tabelas
     if (iaData.rotina?.length > 0) {
       await supabaseAdmin.from("rotinas_pre_sono").insert(
         iaData.rotina.map((r: any) => ({ ...r, usuario_id: usuarioId, diagnostico_id: diagnosticoId }))
