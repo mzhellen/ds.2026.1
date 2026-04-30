@@ -9,13 +9,13 @@ Funcionalidade: Exibição da Rotina Pré-Sono
   Cenário: Exibição do "Empty State" para novos usuários
     Dado que estou autenticado na plataforma
     Mas eu ainda não processei nenhum diagnóstico
-    Quando eu acesso a página "/routine"
+    Quando eu acesso a página "/rotine"
     Então eu devo ver a mensagem "Nenhuma rotina encontrada"
     E um botão "Criar minha Rotina Agora" que redireciona para "/diagnostic"
 
   Cenário: Ordenação cronológica das atividades
     Dado que eu possuo uma rotina gerada pela IA
-    Quando eu acesso a página "/routine"
+    Quando eu acesso a página "/rotine"
     Então os cards de atividade devem ser exibidos
     E devem estar ordenados de forma crescente pelo campo "ordem"
     E o último card da lista deve ter um destaque visual (cor azul preenchida)

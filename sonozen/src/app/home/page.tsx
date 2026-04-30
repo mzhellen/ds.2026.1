@@ -204,7 +204,7 @@ export default function PaginaPrincipal() {
                 </div>
               </Link>
 
-              <Link href="/routine">
+              <Link href="/rotine">
                 <div className="p-6 rounded-xl bg-gray-900 border border-gray-800 hover:border-purple-500/50 transition-colors shadow-lg group h-full">
                   <div className="w-12 h-12 rounded-lg bg-purple-900/30 flex items-center justify-center mb-4 group-hover:bg-purple-900/50 transition-colors">
                     <Sparkles className="w-6 h-6 text-purple-400" />

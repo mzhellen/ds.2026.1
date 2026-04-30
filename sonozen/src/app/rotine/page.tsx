@@ -1,4 +1,4 @@
-// src/app/routine/page.tsx
+// src/app/rotine/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
