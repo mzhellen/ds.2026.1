@@ -1,4 +1,6 @@
 // src/components/HistoryList.tsx
+import ReactMarkdown from "react-markdown";
+
 interface HistoricoItem {
   id: string;
   pergunta: string;
@@ -25,9 +27,22 @@ export default function HistoryList({ historico }: HistoryListProps) {
             <p className="text-sm text-blue-400 font-medium mb-2 border-b border-gray-800 pb-2">
               <span className="text-gray-500 mr-2">Q:</span>{item.pergunta}
             </p>
-            <p className="text-gray-300 text-sm leading-relaxed whitespace-pre-wrap">
-              {item.resposta}
-            </p>
+            
+            {/* Aqui entra o ReactMarkdown formatando tudo lindamente */}
+            <div className="text-gray-300 text-sm leading-relaxed">
+              <ReactMarkdown
+                components={{
+                  strong: ({node, ...props}) => <span className="font-bold text-blue-400" {...props} />,
+                  p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} />,
+                  ul: ({node, ...props}) => <ul className="list-disc pl-5 mb-2" {...props} />,
+                  ol: ({node, ...props}) => <ol className="list-decimal pl-5 mb-2" {...props} />,
+                  li: ({node, ...props}) => <li className="mb-1" {...props} />,
+                }}
+              >
+                {item.resposta}
+              </ReactMarkdown>
+            </div>
+
             <span className="text-[10px] text-gray-500 mt-4 block uppercase tracking-wider">
               {new Date(item.created_at).toLocaleString("pt-BR")}
             </span>
